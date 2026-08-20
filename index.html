@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<base target="_top">
+<title>Appirio Shark Tank — Judge Scoresheet</title>
+<style>
+  :root{
+    --ink:#10222c; --ink-soft:#4a5a66; --muted:#6b7b87;
+    --line:#dde3e8; --line-soft:#eef1f4;
+    --bg:#f5f7f8; --card:#ffffff;
+    --accent:#0b6b7a; --accent-dark:#085562; --accent-soft:#e6f2f4;
+    --warn:#8a4b12; --warn-bg:#fdf3e7;
+    --good:#1f6b3a;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(16,34,44,.06), 0 4px 14px rgba(16,34,44,.05);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent)}
+  h1,h2,h3{line-height:1.25; margin:0}
+  .wrap{max-width:900px; margin:0 auto; padding:0 24px}
+
+  /* ── Header ───────────────────────────────────────────── */
+  header{
+    position:sticky; top:0; z-index:20; background:var(--card);
+    border-bottom:1px solid var(--line);
+  }
+  .head-row{display:flex; align-items:baseline; justify-content:space-between; gap:16px; padding:14px 0 12px}
+  .brand{font-size:17px; font-weight:650; letter-spacing:-.01em}
+  .brand span{color:var(--muted); font-weight:400}
+  .stepcount{font-size:13px; color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums}
+  .bar{height:4px; background:var(--line-soft)}
+  .bar > i{display:block; height:100%; width:0; background:var(--accent); transition:width .25s ease}
+
+  /* ── Page body ────────────────────────────────────────── */
+  main{padding:32px 0 132px}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:28px 30px; margin-bottom:20px;
+  }
+  .eyebrow{font-size:12px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); margin-bottom:10px}
+  h1.title{font-size:28px; letter-spacing:-.02em}
+  h2.title{font-size:24px; letter-spacing:-.02em}
+  .subhead{margin-top:10px; font-size:16px}
+  .subhead a{font-weight:600}
+  p{margin:14px 0}
+  .lede{color:var(--ink-soft)}
+  ul.plain{margin:14px 0; padding-left:22px; color:var(--ink-soft)}
+  ul.plain li{margin:7px 0}
+  .qlabel{font-size:16px; font-weight:650; margin:0 0 4px}
+  .qhelp{font-size:13.5px; color:var(--muted); margin:0 0 14px}
+  .field{margin-top:26px; padding-top:24px; border-top:1px solid var(--line-soft)}
+  .field:first-child{margin-top:0; padding-top:0; border-top:0}
+
+  input[type=text], input[type=email], input[type=password], textarea{
+    width:100%; font:inherit; color:var(--ink); background:#fff;
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px;
+  }
+  input:focus, textarea:focus{outline:2px solid var(--accent-soft); border-color:var(--accent)}
+  textarea{min-height:120px; resize:vertical}
+  .hint{font-size:13px; color:var(--muted); margin-top:6px}
+
+  /* ── Grids ────────────────────────────────────────────── */
+  table.grid{width:100%; border-collapse:separate; border-spacing:0; font-size:14.5px}
+  table.grid th, table.grid td{border-bottom:1px solid var(--line-soft); padding:0}
+  table.grid thead th{
+    padding:0 6px 10px; font-size:13px; font-weight:650; color:var(--ink-soft);
+    text-align:center; white-space:nowrap; border-bottom:1px solid var(--line);
+  }
+  table.grid thead th.rowhead{text-align:left; width:44%}
+  table.grid tbody tr:hover{background:#fbfcfd}
+  td.rowhead, th.rowhead-cell{
+    text-align:left; font-weight:500; color:var(--ink); width:44%;
+    padding:8px 14px 8px 2px; line-height:1.3;
+  }
+  /* Fixed row height keeps the rhythm even where a criterion wraps to two lines. */
+  table.grid tbody tr{height:54px}
+  td.opt{text-align:center; width:14%}
+  td.opt label{
+    display:flex; align-items:center; justify-content:center; height:100%;
+    padding:12px 0; cursor:pointer; border-radius:6px;
+  }
+  td.opt label:hover{background:var(--accent-soft)}
+  input[type=radio], input[type=checkbox]{width:17px; height:17px; margin:0; accent-color:var(--accent); cursor:pointer}
+  tr.missing td{background:#fff8f2}
+  tr.missing td.rowhead{box-shadow:inset 3px 0 0 #d98a3f}
+  .field.flagged input[type=text], .field.flagged textarea{border-color:#d98a3f; background:#fffaf5}
+
+  /* rank grid */
+  table.grid.rank td.rowhead{font-size:14.5px}
+  table.grid.rank thead th{width:11%}
+  table.grid.rank thead th.rowhead{width:45%}
+  td.opt.checked label{background:var(--accent-soft)}
+
+  /* ── Tooltips ─────────────────────────────────────────── */
+  .tip{position:relative}
+  .tip:hover::after, .tip:focus-visible::after{
+    content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+    background:var(--ink); color:#fff; font-size:12.5px; font-weight:400; line-height:1.4;
+    padding:7px 10px; border-radius:6px; width:max-content; max-width:230px; text-align:center;
+    z-index:30; pointer-events:none; box-shadow:0 4px 14px rgba(16,34,44,.22);
+  }
+  .info{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:15px; height:15px; margin-left:7px; border-radius:50%; vertical-align:1px;
+    border:1px solid var(--line); background:#fff; color:var(--muted);
+    font-size:10.5px; font-weight:700; line-height:1; cursor:help; user-select:none;
+  }
+  .info:hover, .info:focus-visible{
+    border-color:var(--accent); background:var(--accent-soft); color:var(--accent); outline:none;
+  }
+  .info.tip:hover::after, .info.tip:focus-visible::after{max-width:260px}
+
+  /* ── Footer nav ───────────────────────────────────────── */
+  footer{
+    position:fixed; bottom:0; left:0; right:0; z-index:20;
+    background:var(--card); border-top:1px solid var(--line);
+  }
+  .foot-row{display:flex; align-items:center; gap:12px; padding:14px 0}
+  .spacer{flex:1}
+  button{font:inherit; border-radius:8px; cursor:pointer; padding:10px 20px; border:1px solid transparent}
+  button:disabled{opacity:.45; cursor:not-allowed}
+  .btn-primary{background:var(--accent); color:#fff; font-weight:600}
+  .btn-primary:hover:not(:disabled){background:var(--accent-dark)}
+  .btn-ghost{background:#fff; border-color:var(--line); color:var(--ink)}
+  .btn-ghost:hover:not(:disabled){border-color:var(--muted)}
+  .btn-quiet{background:none; color:var(--muted); font-size:14px; padding:10px 12px}
+  .btn-quiet:hover{color:#b0341f; text-decoration:underline}
+  .btn-big{padding:14px 30px; font-size:17px}
+  .savenote{font-size:13px; color:var(--muted)}
+
+  /* ── Password gate ────────────────────────────────────── */
+  #gate{display:flex; align-items:center; justify-content:center; min-height:100vh; padding:24px}
+  #gate .card{max-width:440px; width:100%; margin:0}
+  #gate h1{font-size:22px; letter-spacing:-.02em}
+  .err{
+    display:none; margin-top:14px; padding:10px 12px; border-radius:8px;
+    background:#fdeceb; color:#a02a1c; font-size:14px; border:1px solid #f6d4d0;
+  }
+  .err.show{display:block}
+
+  /* ── Misc ─────────────────────────────────────────────── */
+  .banner{
+    padding:12px 14px; border-radius:8px; background:var(--warn-bg); border:1px solid #f0dcc2;
+    color:var(--warn); font-size:14.5px; margin-bottom:20px;
+  }
+  .banner ul{margin:8px 0 0; padding-left:20px}
+  .banner li{margin:4px 0}
+  .banner a{color:var(--warn); font-weight:600}
+  .check-list{list-style:none; margin:16px 0 0; padding:0; font-size:15px}
+  .check-list li{padding:7px 0; border-bottom:1px solid var(--line-soft); display:flex; gap:10px; align-items:baseline}
+  .check-list .mark{width:18px; color:var(--good); font-weight:700}
+  .check-list .mark.no{color:#c2551f}
+  .check-list .mark.soft{color:var(--muted)}
+  .check-list a{color:var(--ink); text-decoration:none; border-bottom:1px solid var(--line)}
+  .check-list a:hover{border-color:var(--accent); color:var(--accent)}
+  .rank-summary{margin:14px 0 0; padding:0; list-style:none; font-size:15px}
+  .rank-summary li{padding:6px 0}
+  .rank-summary b{display:inline-block; width:64px; color:var(--muted); font-weight:600; font-size:13px; text-transform:uppercase; letter-spacing:.05em}
+  .done{text-align:center; padding:48px 30px}
+  .done .big{font-size:44px; line-height:1}
+  .hidden{display:none !important}
+</style>
+</head>
+<body>
+
+<!-- ── Password gate ─────────────────────────────────────── -->
+<div id="gate">
+  <div class="card">
+    <div class="eyebrow">Appirio Shark Tank</div>
+    <h1>Judge Scoresheet</h1>
+    <p class="lede">Async review round. Enter the shared password from your invite email to begin.</p>
+    <input type="password" id="pw" placeholder="Password" style="margin-top:6px" autocomplete="current-password" aria-label="Shared password">
+    <div class="err" id="gate-err"></div>
+    <p style="margin-top:18px"><button class="btn-primary" id="gate-go">Enter</button></p>
+  </div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────── -->
+<div id="app" class="hidden">
+  <header>
+    <div class="wrap head-row">
+      <div class="brand">Appirio Shark Tank <span>· Judge Scoresheet</span></div>
+      <div class="stepcount" id="stepcount"></div>
+    </div>
+    <div class="bar"><i id="progress"></i></div>
+  </header>
+
+  <main><div class="wrap" id="page"></div></main>
+
+  <footer>
+    <div class="wrap foot-row">
+      <button class="btn-ghost" id="back">← Back</button>
+      <button class="btn-primary" id="next">Next →</button>
+      <span class="savenote" id="savenote">Answers save automatically in this browser</span>
+      <span class="spacer"></span>
+      <button class="btn-quiet" id="clear">Clear entire form</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// Config
+// ═══════════════════════════════════════════════════════════
+var CONFIG = {
+  // Optional: shown on the instructions page. Leave '' to hide.
+  deadline: '',
+
+  // Where this page sends the password check and the finished scoresheet when it is
+  // NOT being served by Apps Script itself — i.e. the GitHub Pages copy judges use.
+  execUrl: 'https://script.google.com/macros/s/AKfycbzb1X8LvDNXHM7PRCC3O2fGRd9XNrQNRQZPl-PHxHkDvomdrwTBv86lS5rF_ZvH9GvG/exec'
+};
+
+var STORE_KEY = 'appirioSharkTank.v1';
+
+var CRITERIA = [
+  { key:'market',   label:'Compelling market opportunity',
+    detail:"Large, growing market that's addressable by this entrepreneur",
+    tips:{4:'Large, growing, addressable market', 3:'Good market opportunity', 2:'Niche or limited', 1:'Not addressed'} },
+  { key:'insight',  label:'Distinctive insight on a solution',
+    detail:'Compelling solution description and demo',
+    tips:{4:'Highly compelling demo', 3:'Clear, functional demo', 2:'Confusing or incomplete', 1:"No solution demo'd"} },
+  { key:'founder',  label:'Founder fit with opportunity',
+    detail:'Relevant background for this opportunity',
+    tips:{4:'Perfect domain expertise', 3:'Relevant prior experience', 2:'Limited relevant experience', 1:'Not relevant'} },
+  { key:'traction', label:'Traction or Proof',
+    detail:'Feedback (or revenue) from target customers',
+    tips:{4:'Real evidence of traction', 3:'Indications of traction potential', 2:'Very little actual feedback', 1:'No traction'} },
+  { key:'energy',   label:'Energy, enthusiasm, and FUN pitch',
+    detail:'A pitch that Appirio alumni will love to watch',
+    tips:{4:'Extremely engaging pitch', 3:'Fun and interesting', 2:'Somewhat dry pitch', 1:"Wouldn't watch again"} },
+  { key:'bottom',   label:'Bottom line: Do they belong on the Shark Tank Stage?',
+    detail:'Your overall call on this pitch',
+    tips:{4:'Absolutely', 3:'Probably', 2:'Probably not', 1:'No'} }
+];
+
+var SCALE = [
+  { value:4, label:'4 = Strong' },
+  { value:3, label:'3 = Good' },
+  { value:2, label:'2 = Weak' },
+  { value:1, label:'1 = Missing' }
+];
+
+// ═══════════════════════════════════════════════════════════
+// Server bridge (Apps Script live, or a local preview shim)
+// ═══════════════════════════════════════════════════════════
+var LIVE = (typeof google !== 'undefined' && google.script && google.script.run);
+
+// text/plain keeps this a "simple" request — no CORS preflight, which Apps Script
+// does not answer. The response carries Access-Control-Allow-Origin: *.
+function post(action, body, cb) {
+  fetch(CONFIG.execUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(Object.assign({ action: action }, body))
+  })
+    .then(function (r) { return r.json(); })
+    .then(cb)
+    .catch(function () {
+      cb({ ok:false, error:'Could not reach the server. Check your connection and try again — nothing was lost.' });
+    });
+}
+
+var Server = {
+  authenticate: function (pw, cb) {
+    if (window.PREVIEW) return cb(window.PREVIEW.authenticate(pw));
+    if (LIVE) {
+      return google.script.run.withSuccessHandler(cb)
+        .withFailureHandler(function (e) { cb({ ok:false, error:e.message }); })
+        .authenticate(pw);
+    }
+    if (CONFIG.execUrl) return post('auth', { password: pw }, cb);
+    cb({ ok:false, error:'No backend configured.' });
+  },
+  submit: function (pw, payload, cb) {
+    if (window.PREVIEW) return cb(window.PREVIEW.submit(payload));
+    if (LIVE) {
+      return google.script.run.withSuccessHandler(cb)
+        .withFailureHandler(function (e) { cb({ ok:false, error:e.message }); })
+        .submitResponses(pw, payload);
+    }
+    if (CONFIG.execUrl) return post('submit', { password: pw, payload: payload }, cb);
+    cb({ ok:false, error:'No backend configured.' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════
+var STARTUPS = [];
+var PASSWORD = '';
+var state = blankState();
+
+function blankState() {
+  return { email:'', order:[], responses:{}, ranks:{}, rankWhy:'', comments:'', page:0, seed:0 };
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORE_KEY + '.pw', PASSWORD);
+  } catch (e) {}
+}
+function load() {
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      var s = JSON.parse(raw);
+      if (s && typeof s === 'object') state = Object.assign(blankState(), s);
+    }
+  } catch (e) {}
+}
+function wipe() {
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+}
+
+function byId(id) {
+  for (var i = 0; i < STARTUPS.length; i++) if (STARTUPS[i].id === id) return STARTUPS[i];
+  return null;
+}
+function resp(id) {
+  if (!state.responses[id]) state.responses[id] = { scores:{}, why:'', feedback:'' };
+  if (!state.responses[id].scores) state.responses[id].scores = {};
+  return state.responses[id];
+}
+function answerCount() {
+  var n = 0;
+  Object.keys(state.responses).forEach(function (id) {
+    var r = state.responses[id];
+    n += Object.keys(r.scores || {}).length + (r.why ? 1 : 0) + (r.feedback ? 1 : 0);
+  });
+  return n + Object.keys(state.ranks).length + (state.rankWhy ? 1 : 0);
+}
+
+// Deterministic shuffle so a judge keeps the same order across refreshes.
+function rng(seed) {
+  var t = seed >>> 0;
+  return function () {
+    t += 0x6D2B79F5;
+    var r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffleOrder(seed) {
+  var rand = rng(seed);
+  var a = STARTUPS.map(function (s) { return s.id; });
+  for (var i = a.length - 1; i > 0; i--) {
+    var j = Math.floor(rand() * (i + 1));
+    var t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  return a;
+}
+function ensureOrder(force) {
+  var ids = STARTUPS.map(function (s) { return s.id; }).sort().join(',');
+  var have = (state.order || []).slice().sort().join(',');
+  if (force || !state.order.length || have !== ids) {
+    state.seed = Math.floor(Math.random() * 2147483647);
+    state.order = shuffleOrder(state.seed);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// Pages
+// ═══════════════════════════════════════════════════════════
+function pages() {
+  var p = [{ type:'intro' }];
+  state.order.forEach(function (id) { p.push({ type:'startup', id:id }); });
+  p.push({ type:'summary' });
+  p.push({ type:'review' });
+  return p;
+}
+function totalPages() { return pages().length; }
+
+function el(tag, attrs, kids) {
+  var n = document.createElement(tag);
+  if (attrs) Object.keys(attrs).forEach(function (k) {
+    if (k === 'text') n.textContent = attrs[k];
+    else if (k === 'html') n.innerHTML = attrs[k];
+    else if (k === 'class') n.className = attrs[k];
+    else if (k.slice(0,2) === 'on') n.addEventListener(k.slice(2), attrs[k]);
+    else if (attrs[k] === true) n.setAttribute(k, '');
+    else if (attrs[k] !== false && attrs[k] != null) n.setAttribute(k, attrs[k]);
+  });
+  (kids || []).forEach(function (k) { if (k) n.appendChild(k); });
+  return n;
+}
+function card(kids) { return el('div', { class:'card' }, kids); }
+
+// ── Intro ──────────────────────────────────────────────────
+function renderIntro() {
+  var frag = document.createDocumentFragment();
+
+  var body = [
+    el('div', { class:'eyebrow', text:'Async review round' }),
+    el('h1', { class:'title', text:'Appirio Shark Tank — Judge Scoresheet' }),
+    el('p', { class:'lede', html:
+      'Thanks for judging. You\'ll watch <b>' + STARTUPS.length + ' pitch videos</b> and score each one on six criteria, ' +
+      'then pick your Top 5. Budget roughly 5&ndash;8 minutes per startup.' }),
+    el('ul', { class:'plain', html:
+      '<li><b>One startup per page.</b> Watch the video, score the six criteria, add a short "why," and leave the founder some constructive feedback.</li>' +
+      '<li><b>The order is randomized</b> for every judge, so no one gets an advantage from going first or last.</li>' +
+      '<li><b>Scores run 4 (Strong) to 1 (Missing).</b> Hover any score to see what it means for that criterion.</li>' +
+      '<li><b>You can stop and come back.</b> Answers save in this browser automatically &mdash; just don\'t switch computers or clear your history mid-review.</li>' +
+      '<li><b>Nothing is recorded until you hit Submit</b> on the final page.</li>' })
+  ];
+  if (CONFIG.deadline) body.push(el('p', { html:'<b>Please submit by ' + CONFIG.deadline + '.</b>' }));
+  body.push(el('p', { class:'hint', text:'Questions? Just reply to the email that sent you here.' }));
+  frag.appendChild(card(body));
+
+  var input = el('input', { type:'email', id:'email', placeholder:'you@example.com',
+    value:state.email, autocomplete:'email', 'aria-label':'Your email address' });
+  input.addEventListener('input', function () { state.email = input.value.trim(); save(); });
+  frag.appendChild(card([
+    el('p', { class:'qlabel', text:'Your email address' }),
+    el('p', { class:'qhelp', text:'So we can attribute your scores and follow up if we have questions. Required.' }),
+    input
+  ]));
+  return frag;
+}
+
+// ── One startup ────────────────────────────────────────────
+function renderStartup(id, showMissing) {
+  var s = byId(id), r = resp(id);
+  var frag = document.createDocumentFragment();
+  var pos = state.order.indexOf(id) + 1;
+
+  // Q1 grid
+  var head = el('tr', {}, [el('th', { class:'rowhead', text:'' })]);
+  SCALE.forEach(function (c) { head.appendChild(el('th', { text:c.label })); });
+
+  var tbody = el('tbody');
+  CRITERIA.forEach(function (crit) {
+    var missing = showMissing && !r.scores[crit.key];
+    var tr = el('tr', { class: missing ? 'missing' : '' });
+    tr.appendChild(el('td', { class:'rowhead' }, [
+      el('span', { text:crit.label }),
+      el('span', { class:'info tip', 'data-tip':crit.detail, text:'i',
+        tabindex:'0', role:'note', 'aria-label':crit.label + '. ' + crit.detail })
+    ]));
+    SCALE.forEach(function (c) {
+      var input = el('input', { type:'radio', name:id + '-' + crit.key, value:c.value,
+        'aria-label':crit.label + ': ' + c.label });
+      if (Number(r.scores[crit.key]) === c.value) input.checked = true;
+      input.addEventListener('change', function () {
+        r.scores[crit.key] = c.value; save();
+        tr.className = '';
+      });
+      tr.appendChild(el('td', { class:'opt tip', 'data-tip':c.value + ' — ' + crit.tips[c.value] },
+        [el('label', {}, [input])]));
+    });
+    tbody.appendChild(tr);
+  });
+
+  var nMissing = CRITERIA.filter(function (c) { return !r.scores[c.key]; }).length;
+  var whyBlank = !String(r.why || '').trim();
+  var fbBlank = !String(r.feedback || '').trim();
+
+  var parts = [];
+  if (nMissing) parts.push(nMissing === 6 ? 'none of the 6 criteria are scored'
+                                          : nMissing + ' of the 6 criteria are unscored');
+  if (whyBlank && fbBlank) parts.push('both written answers are blank');
+  else if (whyBlank) parts.push('\u201cWhy or why not?\u201d is blank');
+  else if (fbBlank) parts.push('the constructive feedback is blank');
+
+  var flag = (showMissing && parts.length)
+    ? el('div', { class:'banner', text:'Still to do on ' + s.name + ': ' + joinList(parts) +
+        '. The highlighted fields below are waiting \u2014 or press Next again to move on and come back later.' })
+    : null;
+
+  frag.appendChild(card([
+    el('div', { class:'eyebrow', text:'Startup ' + pos + ' of ' + state.order.length }),
+    el('h2', { class:'title', text:s.name }),
+    el('p', { class:'subhead', html:
+      '<a href="' + s.video + '" target="_blank" rel="noopener">Watch Pitch Video Here</a> &nearr;' }),
+    flag,
+    el('div', { class:'field' }, [
+      el('p', { class:'qlabel', text:'Score this pitch' }),
+      el('p', { class:'qhelp', text:'Hover the i beside a criterion, or any score, to see the rubric.' }),
+      el('table', { class:'grid' }, [el('thead', {}, [head]), tbody])
+    ]),
+    unflagOnType(el('div', { class:'field' + (showMissing && whyBlank ? ' flagged' : '') }, [
+      el('p', { class:'qlabel', text:'Why or why not?' }),
+      el('p', { class:'qhelp', text:'A sentence or two on your bottom-line call. Shared with the organizers only.' }),
+      bindText(el('input', { type:'text', value:r.why, placeholder:'Your answer' }), function (v) { r.why = v; })
+    ])),
+    unflagOnType(el('div', { class:'field' + (showMissing && fbBlank ? ' flagged' : '') }, [
+      el('p', { class:'qlabel', text:'What constructive feedback do you have for this founder?' }),
+      el('p', { class:'qhelp', text:'This may be passed along to the founder, so be specific and be kind.' }),
+      bindText(el('textarea', { placeholder:'Your answer' }), function (v) { r.feedback = v; }, r.feedback)
+    ]))
+  ]));
+  return frag;
+}
+
+function joinList(a) {
+  if (a.length <= 1) return a[0] || '';
+  return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+}
+function unflagOnType(field) {
+  field.addEventListener('input', function () { field.classList.remove('flagged'); });
+  return field;
+}
+
+function bindText(node, setter, initial) {
+  if (initial != null) node.value = initial;
+  node.addEventListener('input', function () { setter(node.value); saveSoon(); });
+  node.addEventListener('blur', save);
+  return node;
+}
+var saveTimer = null;
+function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); }
+
+// ── Summary ────────────────────────────────────────────────
+function renderSummary(showMissing) {
+  var frag = document.createDocumentFragment();
+  var RANKS = [1,2,3,4,5];
+
+  var head = el('tr', {}, [el('th', { class:'rowhead', text:'' })]);
+  RANKS.forEach(function (n) { head.appendChild(el('th', { text:String(n) })); });
+
+  var tbody = el('tbody');
+  var redraw = [];
+  state.order.forEach(function (id) {
+    var s = byId(id);
+    var tr = el('tr');
+    tr.appendChild(el('td', { class:'rowhead', text:s.name }));
+    RANKS.forEach(function (n) {
+      var box = el('input', { type:'checkbox', 'aria-label':s.name + ' at rank ' + n });
+      var cell = el('td', { class:'opt' }, [el('label', {}, [box])]);
+      box.addEventListener('change', function () {
+        if (box.checked) {
+          // one startup per rank, one rank per startup
+          Object.keys(state.ranks).forEach(function (k) {
+            if (state.ranks[k] === id) delete state.ranks[k];
+          });
+          state.ranks[String(n)] = id;
+        } else {
+          if (state.ranks[String(n)] === id) delete state.ranks[String(n)];
+        }
+        save();
+        redraw.forEach(function (f) { f(); });
+      });
+      redraw.push(function () {
+        var on = state.ranks[String(n)] === id;
+        box.checked = on;
+        cell.className = 'opt' + (on ? ' checked' : '');
+      });
+      tr.appendChild(cell);
+    });
+    tbody.appendChild(tr);
+  });
+  redraw.forEach(function (f) { f(); });
+
+  var picked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; }).length;
+  var counter = el('p', { class:'hint', text:picked + ' of 5 ranks assigned' });
+  var recount = function () {
+    var p = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; }).length;
+    counter.textContent = p + ' of 5 ranks assigned';
+  };
+  redraw.push(recount);
+
+  var kids = [
+    el('div', { class:'eyebrow', text:'Final section' }),
+    el('h2', { class:'title', text:'Summary' }),
+    el('p', { class:'lede', text:'Now that you have seen them all, pick the five you would most want on the Shark Tank stage.' })
+  ];
+  if (showMissing && picked < 5) {
+    kids.push(el('div', { class:'banner', text:'Assign all five ranks below before submitting.' }));
+  }
+  kids.push(el('div', { class:'field' }, [
+    el('p', { class:'qlabel', text:'Rank your Top 5 Startups' }),
+    el('p', { class:'qhelp', text:'1 is your top pick. One startup per column, one column per startup — checking a new box moves that startup.' }),
+    el('table', { class:'grid rank' }, [el('thead', {}, [head]), tbody]),
+    counter
+  ]));
+  kids.push(el('div', { class:'field' }, [
+    el('p', { class:'qlabel', text:'Why these 5? Please Explain…' }),
+    bindText(el('textarea', { placeholder:'Your answer' }), function (v) { state.rankWhy = v; }, state.rankWhy)
+  ]));
+  kids.push(el('div', { class:'field' }, [
+    el('p', { class:'qlabel', text:'Overall, any other questions or comments?' }),
+    el('p', { class:'qhelp', text:'Anything about the cohort, the process, or the event itself. Optional.' }),
+    bindText(el('textarea', { placeholder:'Your answer' }), function (v) { state.comments = v; }, state.comments)
+  ]));
+
+  frag.appendChild(card(kids));
+  return frag;
+}
+
+// ── Review / submit ────────────────────────────────────────
+function isWrittenBlank(id) {
+  var r = resp(id);
+  return !String(r.why || '').trim() || !String(r.feedback || '').trim();
+}
+function firstBlankWritten() {
+  for (var i = 0; i < state.order.length; i++) if (isWrittenBlank(state.order[i])) return i;
+  return 0;
+}
+
+function issues() {
+  var out = [];
+  var idx = pages();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.email)) {
+    out.push({ text:'Add your email address', page:0 });
+  }
+  state.order.forEach(function (id, i) {
+    var r = resp(id);
+    var missing = CRITERIA.filter(function (c) { return !r.scores[c.key]; }).length;
+    if (missing) {
+      out.push({ text:byId(id).name + ' — ' + missing + ' of 6 scores missing', page:i + 1 });
+    }
+  });
+  var picked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; });
+  if (picked.length < 5) {
+    out.push({ text:'Rank your Top 5 (' + picked.length + ' of 5 assigned)', page:idx.length - 2 });
+  }
+  return out;
+}
+
+function renderReview() {
+  var frag = document.createDocumentFragment();
+  var probs = issues();
+  var scored = state.order.filter(function (id) {
+    return CRITERIA.every(function (c) { return resp(id).scores[c.key]; });
+  }).length;
+  var written = state.order.filter(function (id) { return !isWrittenBlank(id); }).length;
+
+  var kids = [
+    el('div', { class:'eyebrow', text:'One last step' }),
+    el('h2', { class:'title', text:'Thank you' }),
+    el('p', { class:'lede', html:
+      'Thank you for giving these founders your time and your honest read &mdash; the feedback you wrote is often the most valuable ' +
+      'thing they get out of this round. Hit Submit below and you are done.' })
+  ];
+
+  if (probs.length) {
+    var ul = el('ul');
+    probs.forEach(function (p) {
+      var a = el('a', { href:'#', text:p.text, onclick:function (e) { e.preventDefault(); go(p.page); } });
+      ul.appendChild(el('li', {}, [a]));
+    });
+    kids.push(el('div', { class:'banner' }, [
+      el('div', { html:'<b>A few things still need answers.</b> Click to jump:' }), ul
+    ]));
+  }
+
+  var list = el('ul', { class:'check-list' });
+  [
+    { ok:/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.email), text:state.email ? 'Judging as ' + state.email : 'Email address missing', page:0 },
+    { ok:scored === state.order.length, text:scored + ' of ' + state.order.length + ' startups fully scored', page:1 },
+    { ok:[1,2,3,4,5].every(function (n) { return state.ranks[String(n)]; }), text:'Top 5 ranked', page:pages().length - 2 },
+    written === state.order.length
+      ? { ok:true, text:'Written answers on all ' + state.order.length + ' startups', page:1 }
+      : { ok:false, soft:true, page:firstBlankWritten() + 1,
+          text:(state.order.length - written === 1
+                 ? '1 startup has a blank written answer'
+                 : (state.order.length - written) + ' of ' + state.order.length +
+                   ' startups have a blank written answer') +
+            ' — optional, but the founders read these' }
+  ].forEach(function (row) {
+    list.appendChild(el('li', {}, [
+      el('span', { class:'mark' + (row.ok ? '' : (row.soft ? ' soft' : ' no')), text:row.ok ? '✓' : (row.soft ? '·' : '!') }),
+      el('a', { href:'#', text:row.text, onclick:function (e) { e.preventDefault(); go(row.page); } })
+    ]));
+  });
+  kids.push(list);
+
+  var ranked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; });
+  if (ranked.length) {
+    var rl = el('ul', { class:'rank-summary' });
+    ranked.forEach(function (n) {
+      rl.appendChild(el('li', { html:'<b>No. ' + n + '</b> ' + escapeHtml(byId(state.ranks[String(n)]).name) }));
+    });
+    kids.push(el('div', { class:'field' }, [el('p', { class:'qlabel', text:'Your Top 5' }), rl]));
+  }
+
+  var err = el('div', { class:'err', id:'submit-err' });
+  var btn = el('button', { class:'btn-primary btn-big', text:'Submit my scoresheet' });
+  btn.addEventListener('click', function () { doSubmit(btn, err); });
+  kids.push(el('div', { class:'field' }, [
+    btn,
+    el('p', { class:'hint', text:'Submitting sends everything to the organizers\' Google Sheet. You can resubmit later if you need to change something.' }),
+    err
+  ]));
+
+  frag.appendChild(card(kids));
+  return frag;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, function (c) {
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+  });
+}
+
+function doSubmit(btn, err) {
+  var probs = issues();
+  if (probs.length) {
+    err.textContent = 'Still missing: ' + probs.map(function (p) { return p.text; }).join('; ') + '.';
+    err.className = 'err show';
+    return;
+  }
+  err.className = 'err';
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  Server.submit(PASSWORD, {
+    email: state.email,
+    order: state.order,
+    responses: state.responses,
+    ranks: state.ranks,
+    rankWhy: state.rankWhy,
+    comments: state.comments
+  }, function (res) {
+    if (res && res.ok) {
+      renderDone(res.submissionId);
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Submit my scoresheet';
+      err.textContent = (res && res.error) || 'Something went wrong. Try again in a moment.';
+      err.className = 'err show';
+    }
+  });
+}
+
+function renderDone(sid) {
+  document.getElementById('progress').style.width = '100%';
+  document.getElementById('stepcount').textContent = 'Submitted';
+  document.querySelector('footer').classList.add('hidden');
+  var page = document.getElementById('page');
+  page.innerHTML = '';
+  page.appendChild(card([
+    el('div', { class:'done' }, [
+      el('div', { class:'big', text:'🦈' }),
+      el('h2', { class:'title', text:'Scoresheet received', style:'margin-top:16px' }),
+      el('p', { class:'lede', html:'Thanks, ' + escapeHtml(state.email) + '. Your scores for all ' + state.order.length +
+        ' startups and your Top 5 are recorded.' + (sid ? '<br>Confirmation code <b>' + sid + '</b>.' : '') }),
+      el('p', { class:'hint', text:'You can close this tab. If you need to change an answer, reopen the link and submit again — the latest submission wins.' }),
+      el('p', {}, [el('button', { class:'btn-ghost', text:'Back to my answers',
+        onclick:function () { document.querySelector('footer').classList.remove('hidden'); go(state.page); } })])
+    ])
+  ]));
+  window.scrollTo(0, 0);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Navigation
+// ═══════════════════════════════════════════════════════════
+var showMissingOn = {};
+
+function go(n) {
+  var p = pages();
+  state.page = Math.max(0, Math.min(n, p.length - 1));
+  save();
+  render();
+  window.scrollTo(0, 0);
+}
+
+function render() {
+  var p = pages(), i = state.page, cur = p[i];
+  var host = document.getElementById('page');
+  host.innerHTML = '';
+
+  if (cur.type === 'intro') host.appendChild(renderIntro());
+  else if (cur.type === 'startup') host.appendChild(renderStartup(cur.id, !!showMissingOn[cur.id]));
+  else if (cur.type === 'summary') host.appendChild(renderSummary(!!showMissingOn.summary));
+  else host.appendChild(renderReview());
+
+  document.getElementById('progress').style.width = (i / (p.length - 1) * 100) + '%';
+  var label = cur.type === 'intro' ? 'Instructions'
+    : cur.type === 'startup' ? 'Startup ' + i + ' of ' + state.order.length
+    : cur.type === 'summary' ? 'Summary' : 'Review & submit';
+  document.getElementById('stepcount').textContent = label + '  ·  Page ' + (i + 1) + ' of ' + p.length;
+
+  document.getElementById('back').disabled = i === 0;
+  var next = document.getElementById('next');
+  next.classList.toggle('hidden', i === p.length - 1);
+  next.textContent = (cur.type === 'summary') ? 'Review & submit →' : 'Next →';
+}
+
+document.getElementById('back').addEventListener('click', function () { go(state.page - 1); });
+document.getElementById('next').addEventListener('click', function () {
+  var cur = pages()[state.page];
+  // First Next on an incomplete page flags what's missing and stays put;
+  // a second Next moves on anyway, so nobody gets trapped.
+  if (cur.type === 'startup') {
+    var r = resp(cur.id);
+    var blank = !CRITERIA.every(function (c) { return r.scores[c.key]; })
+      || !String(r.why || '').trim() || !String(r.feedback || '').trim();
+    if (blank && !showMissingOn[cur.id]) { showMissingOn[cur.id] = true; render(); return; }
+  }
+  if (cur.type === 'summary') {
+    var picked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; }).length;
+    if (picked < 5 && !showMissingOn.summary) { showMissingOn.summary = true; render(); return; }
+  }
+  go(state.page + 1);
+});
+document.getElementById('clear').addEventListener('click', function () {
+  if (!confirm('Clear every answer on this scoresheet and start over? This cannot be undone.')) return;
+  var email = state.email;
+  state = blankState();
+  state.email = email;
+  showMissingOn = {};
+  wipe();
+  ensureOrder(true);
+  save();
+  document.querySelector('footer').classList.remove('hidden');
+  go(0);
+});
+
+// ═══════════════════════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════════════════════
+function start(startups) {
+  STARTUPS = startups;
+  load();
+  ensureOrder(false);
+  if (state.page >= pages().length) state.page = 0;
+  save();
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  render();
+}
+
+function tryAuth(pw, onFail) {
+  Server.authenticate(pw, function (res) {
+    // start() loads saved answers first, then persists — saving here would clobber them.
+    if (res && res.ok) { PASSWORD = pw; start(res.startups); }
+    else onFail((res && res.error) || 'Could not check the password. Reload and try again.');
+  });
+}
+
+document.getElementById('gate-go').addEventListener('click', function () {
+  var pw = document.getElementById('pw').value;
+  var err = document.getElementById('gate-err');
+  var btn = this;
+  if (!pw) { err.textContent = 'Enter the password from your invite email.'; err.className = 'err show'; return; }
+  btn.disabled = true; btn.textContent = 'Checking…';
+  tryAuth(pw, function (msg) {
+    btn.disabled = false; btn.textContent = 'Enter';
+    err.textContent = msg; err.className = 'err show';
+    document.getElementById('pw').select();
+  });
+});
+document.getElementById('pw').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('gate-go').click();
+});
+
+// Returning judge in the same browser: skip the gate.
+(function () {
+  var saved = null;
+  try { saved = localStorage.getItem(STORE_KEY + '.pw'); } catch (e) {}
+  if (saved) tryAuth(saved, function () { /* stale password — show the gate */ });
+})();
+</script>
+</body>
+</html>
