@@ -117,6 +117,9 @@
     border-color:var(--accent); background:var(--accent-soft); color:var(--accent); outline:none;
   }
   .info.tip:hover::after, .info.tip:focus-visible::after{max-width:260px}
+  .info.recap:hover::after, .info.recap:focus-visible::after{
+    white-space:pre-line; text-align:left; max-width:none; line-height:1.5;
+  }
 
   /* ── Footer nav ───────────────────────────────────────── */
   footer{
@@ -222,22 +225,22 @@ var CONFIG = {
 var STORE_KEY = 'appirioSharkTank.v1';
 
 var CRITERIA = [
-  { key:'market',   label:'Compelling market opportunity',
+  { key:'market', short:'Market',   label:'Compelling market opportunity',
     detail:"Large, growing market that's addressable by this entrepreneur",
     tips:{4:'Large, growing, addressable market', 3:'Good market opportunity', 2:'Niche or limited', 1:'Not addressed'} },
-  { key:'insight',  label:'Distinctive insight on a solution',
+  { key:'insight', short:'Insight',  label:'Distinctive insight on a solution',
     detail:'Compelling solution description and demo',
     tips:{4:'Highly compelling demo', 3:'Clear, functional demo', 2:'Confusing or incomplete', 1:"No solution demo'd"} },
-  { key:'founder',  label:'Founder fit with opportunity',
+  { key:'founder', short:'Founder fit',  label:'Founder fit with opportunity',
     detail:'Relevant background for this opportunity',
     tips:{4:'Perfect domain expertise', 3:'Relevant prior experience', 2:'Limited relevant experience', 1:'Not relevant'} },
-  { key:'traction', label:'Traction or Proof',
+  { key:'traction', short:'Traction', label:'Traction or Proof',
     detail:'Feedback (or revenue) from target customers',
     tips:{4:'Real evidence of traction', 3:'Indications of traction potential', 2:'Very little actual feedback', 1:'No traction'} },
-  { key:'energy',   label:'Energy, enthusiasm, and FUN pitch',
+  { key:'energy', short:'Energy / fun',   label:'Energy, enthusiasm, and FUN pitch',
     detail:'A pitch that Appirio alumni will love to watch',
     tips:{4:'Extremely engaging pitch', 3:'Fun and interesting', 2:'Somewhat dry pitch', 1:"Wouldn't watch again"} },
-  { key:'bottom',   label:'Bottom line: Do they belong on the Shark Tank Stage?',
+  { key:'bottom', short:'Belongs on stage',   label:'Bottom line: Do they belong on the Shark Tank Stage?',
     detail:'Your overall call on this pitch',
     tips:{4:'Absolutely', 3:'Probably', 2:'Probably not', 1:'No'} }
 ];
@@ -501,6 +504,22 @@ function renderStartup(id, showMissing) {
   return frag;
 }
 
+function scoreRecap(id) {
+  var r = state.responses[id];
+  var scores = (r && r.scores) || {};
+  var given = CRITERIA.filter(function (c) { return scores[c.key]; });
+  if (!given.length) return 'You haven\u2019t scored this one yet.';
+
+  var lines = CRITERIA.map(function (c) {
+    return c.short + ': ' + (scores[c.key] || '\u2014');
+  });
+  var sum = given.reduce(function (t, c) { return t + scores[c.key]; }, 0);
+  lines.push(given.length === CRITERIA.length
+    ? 'Total ' + sum + ' of 24  \u00b7  avg ' + (sum / CRITERIA.length).toFixed(1)
+    : given.length + ' of ' + CRITERIA.length + ' scored  \u00b7  ' + sum + ' so far');
+  return lines.join('\n');
+}
+
 function joinList(a) {
   if (a.length <= 1) return a[0] || '';
   return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
@@ -532,7 +551,12 @@ function renderSummary(showMissing) {
   state.order.forEach(function (id) {
     var s = byId(id);
     var tr = el('tr');
-    tr.appendChild(el('td', { class:'rowhead', text:s.name }));
+    var recap = scoreRecap(id);
+    tr.appendChild(el('td', { class:'rowhead' }, [
+      el('span', { text:s.name }),
+      el('span', { class:'info tip recap', 'data-tip':recap, text:'i',
+        tabindex:'0', role:'note', 'aria-label':'Your scores for ' + s.name + '. ' + recap })
+    ]));
     RANKS.forEach(function (n) {
       var box = el('input', { type:'checkbox', 'aria-label':s.name + ' at rank ' + n });
       var cell = el('td', { class:'opt' }, [el('label', {}, [box])]);
@@ -578,7 +602,7 @@ function renderSummary(showMissing) {
   }
   kids.push(el('div', { class:'field' }, [
     el('p', { class:'qlabel', text:'Rank your Top 5 Startups' }),
-    el('p', { class:'qhelp', text:'1 is your top pick. One startup per column, one column per startup — checking a new box moves that startup.' }),
+    el('p', { class:'qhelp', text:'1 is your top pick. One startup per column, one column per startup — checking a new box moves that startup. Hover the i beside a name to see the scores you gave it.' }),
     el('table', { class:'grid rank' }, [el('thead', {}, [head]), tbody]),
     counter
   ]));
