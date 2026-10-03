@@ -310,8 +310,16 @@ var PASSWORD = '';
 var ROUND = { key:'async', topN:5, shuffle:true };
 var state = blankState();
 
-function isFinals() { return ROUND.key === 'finals'; }
+function isFinals() { return ROUND.key !== 'async'; }     // either finals sheet: 6 finalists, fixed order
+function isFeedback() { return !!ROUND.questions; }       // the written-only sheet: no score grid
+// The written answers asked on each startup page, in order.
+function writtenQs() {
+  return ROUND.questions || [{ key:'why', label:'Why or why not?' }, { key:'feedback', label:'constructive feedback' }];
+}
 function noun() { return isFinals() ? 'Finalist' : 'Startup'; }
+function sheetName() {
+  return isFeedback() ? 'Finals Feedback' : isFinals() ? 'Finals Scoresheet' : 'Judge Scoresheet';
+}
 function rankList() {
   var a = [];
   for (var n = 1; n <= ROUND.topN; n++) a.push(n);
@@ -427,14 +435,21 @@ function renderIntro() {
 
   var body = [
     el('div', { class:'eyebrow', text:isFinals() ? 'Finals' : 'Async review round' }),
-    el('h1', { class:'title', text:isFinals() ? 'Appirio Shark Tank — Finals Scoresheet' : 'Appirio Shark Tank — Judge Scoresheet' }),
-    el('p', { class:'lede', html: isFinals()
+    el('h1', { class:'title', text:'Appirio Shark Tank — ' + sheetName() }),
+    el('p', { class:'lede', html: isFeedback()
+      ? 'Thanks for joining us for the finals. For each of our <b>' + STARTUPS.length + ' finalists</b> you\'ll answer ' +
+        'three quick questions, then pick your Top ' + ROUND.topN + '.'
+      : isFinals()
       ? 'Thanks for judging the finals. You\'ll score each of our <b>' + STARTUPS.length + ' finalists</b> on six criteria, ' +
         'then pick your Top ' + ROUND.topN + '.'
       : 'Thanks for judging. You\'ll watch <b>' + STARTUPS.length + ' pitch videos</b> and score each one on six criteria, ' +
         'then pick your Top ' + ROUND.topN + '. Budget roughly 5&ndash;8 minutes per startup.' }),
-    el('ul', { class:'plain', html:
-      '<li><b>One ' + noun().toLowerCase() + ' per page.</b> Score the six criteria, add a short "why," and leave the founder some constructive feedback. Each page links to the original pitch video.</li>' +
+    el('ul', { class:'plain', html: isFeedback()
+      ? '<li><b>One finalist per page.</b> Tell them what you loved, offer some constructive feedback, and name one thing you can do to help. A line each is plenty. Each page links to the original pitch video.</li>' +
+        '<li><b>The finalists appear in a set order</b>, the same for everyone.</li>' +
+        '<li><b>You can stop and come back.</b> Answers save in this browser automatically.</li>' +
+        '<li><b>Nothing is recorded until you hit Submit</b> on the final page.</li>'
+      : '<li><b>One ' + noun().toLowerCase() + ' per page.</b> Score the six criteria, add a short "why," and leave the founder some constructive feedback. Each page links to the original pitch video.</li>' +
       (isFinals()
         ? '<li><b>The finalists appear in a set order</b>, the same for every judge.</li>'
         : '<li><b>The order is randomized</b> for every judge, so no one gets an advantage from going first or last.</li>') +
@@ -459,6 +474,7 @@ function renderIntro() {
 
 // ── One startup ────────────────────────────────────────────
 function renderStartup(id, showMissing) {
+  if (isFeedback()) return renderFeedbackStartup(id, showMissing);
   var s = byId(id), r = resp(id);
   var frag = document.createDocumentFragment();
   var pos = state.order.indexOf(id) + 1;
@@ -532,7 +548,44 @@ function renderStartup(id, showMissing) {
   return frag;
 }
 
+// The written-only sheet: three one-line questions, no score grid.
+function renderFeedbackStartup(id, showMissing) {
+  var s = byId(id), r = resp(id);
+  var frag = document.createDocumentFragment();
+  var pos = state.order.indexOf(id) + 1;
+  var blank = ROUND.questions.filter(function (q) { return !String(r[q.key] || '').trim(); });
+
+  var kids = [
+    el('div', { class:'eyebrow', text:noun() + ' ' + pos + ' of ' + state.order.length }),
+    el('h2', { class:'title', text:s.name }),
+    s.founder ? el('p', { class:'founder', text:s.founder }) : null,
+    el('p', { class:'subhead', html:
+      '<a href="' + s.video + '" target="_blank" rel="noopener">Watch Pitch Video Here</a> &nearr;' })
+  ];
+  if (showMissing && blank.length) {
+    kids.push(el('div', { class:'banner', text:'Still to do on ' + s.name + ': ' +
+      (blank.length === 1 ? '1 question is blank' : blank.length + ' questions are blank') +
+      '. The highlighted fields below are waiting \u2014 or press Next again to move on and come back later.' }));
+  }
+  ROUND.questions.forEach(function (q) {
+    var isBlank = blank.indexOf(q) >= 0;
+    kids.push(unflagOnType(el('div', { class:'field' + (showMissing && isBlank ? ' flagged' : '') }, [
+      el('p', { class:'qlabel', text:q.label }),
+      el('p', { class:'qhelp', text:q.help }),
+      bindText(el('input', { type:'text', placeholder:'Your answer', 'aria-label':q.label }),
+               function (v) { r[q.key] = v; }, r[q.key] || '')
+    ])));
+  });
+  frag.appendChild(card(kids));
+  return frag;
+}
+
 function scoreRecap(id) {
+  if (isFeedback()) {
+    var loved = String(((state.responses[id] || {}).loved) || '').trim();
+    if (!loved) return 'You haven\u2019t said what you loved about this one yet.';
+    return 'You loved: ' + (loved.length > 160 ? loved.slice(0, 157) + '\u2026' : loved);
+  }
   var r = state.responses[id];
   var scores = (r && r.scores) || {};
   var given = CRITERIA.filter(function (c) { return scores[c.key]; });
@@ -629,7 +682,7 @@ function renderSummary(showMissing) {
     el('div', { class:'eyebrow', text:'Final section' }),
     el('h2', { class:'title', text:'Summary' }),
     el('p', { class:'lede', text: isFinals()
-      ? 'Now that you have scored them all, pick your top three finalists.'
+      ? 'Now that you have ' + (isFeedback() ? 'seen' : 'scored') + ' them all, pick your top three finalists.'
       : 'Now that you have seen them all, pick the five you would most want on the Shark Tank stage.' })
   ];
   if (showMissing && picked < N) {
@@ -637,7 +690,7 @@ function renderSummary(showMissing) {
   }
   kids.push(el('div', { class:'field' }, [
     el('p', { class:'qlabel', text:'Rank your Top ' + N + (isFinals() ? ' Finalists' : ' Startups') }),
-    el('p', { class:'qhelp', text:'1 is your top pick. One startup per column, one column per startup — checking a new box moves that startup. Hover the i beside a name to see the scores you gave it.' }),
+    el('p', { class:'qhelp', text:'1 is your top pick. One startup per column, one column per startup — checking a new box moves that startup. Hover the i beside a name to see ' + (isFeedback() ? 'what you loved about it.' : 'the scores you gave it.') }),
     el('table', { class:'grid rank' }, [el('thead', {}, [head]), tbody]),
     counter
   ]));
@@ -658,7 +711,7 @@ function renderSummary(showMissing) {
 // ── Review / submit ────────────────────────────────────────
 function isWrittenBlank(id) {
   var r = resp(id);
-  return !String(r.why || '').trim() || !String(r.feedback || '').trim();
+  return writtenQs().some(function (q) { return !String(r[q.key] || '').trim(); });
 }
 function firstBlankWritten() {
   for (var i = 0; i < state.order.length; i++) if (isWrittenBlank(state.order[i])) return i;
@@ -715,7 +768,7 @@ function renderReview() {
   var list = el('ul', { class:'check-list' });
   [
     { ok:/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.email), text:state.email ? 'Judging as ' + state.email : 'Email address missing', page:0 },
-    { ok:scored === state.order.length, text:scored + ' of ' + state.order.length + ' ' + noun().toLowerCase() + 's fully scored', page:1 },
+    CRITERIA.length ? { ok:scored === state.order.length, text:scored + ' of ' + state.order.length + ' ' + noun().toLowerCase() + 's fully scored', page:1 } : null,
     { ok:rankedCount() === ROUND.topN, text:'Top ' + ROUND.topN + ' ranked', page:pages().length - 2 },
     written === state.order.length
       ? { ok:true, text:'Written answers on all ' + state.order.length + ' ' + noun().toLowerCase() + 's', page:1 }
@@ -725,7 +778,7 @@ function renderReview() {
                  : (state.order.length - written) + ' of ' + state.order.length +
                    ' ' + noun().toLowerCase() + 's have a blank written answer') +
             ' — optional, but the founders read these' }
-  ].forEach(function (row) {
+  ].filter(Boolean).forEach(function (row) {
     list.appendChild(el('li', {}, [
       el('span', { class:'mark' + (row.ok ? '' : (row.soft ? ' soft' : ' no')), text:row.ok ? '✓' : (row.soft ? '·' : '!') }),
       el('a', { href:'#', text:row.text, onclick:function (e) { e.preventDefault(); go(row.page); } })
@@ -800,7 +853,7 @@ function renderDone(sid) {
     el('div', { class:'done' }, [
       el('div', { class:'big', text:'🦈' }),
       el('h2', { class:'title', text:'Scoresheet received', style:'margin-top:16px' }),
-      el('p', { class:'lede', html:'Thanks, ' + escapeHtml(state.email) + '. Your scores for all ' + state.order.length +
+      el('p', { class:'lede', html:'Thanks, ' + escapeHtml(state.email) + '. Your ' + (isFeedback() ? 'feedback on' : 'scores for') + ' all ' + state.order.length +
         ' ' + noun().toLowerCase() + 's and your Top ' + ROUND.topN + ' are recorded.' + (sid ? '<br>Confirmation code <b>' + sid + '</b>.' : '') }),
       el('p', { class:'hint', text:'You can close this tab. If you need to change an answer, reopen the link and submit again — the latest submission wins.' }),
       el('p', {}, [el('button', { class:'btn-ghost', text:'Back to my answers',
@@ -852,8 +905,7 @@ document.getElementById('next').addEventListener('click', function () {
   // a second Next moves on anyway, so nobody gets trapped.
   if (cur.type === 'startup') {
     var r = resp(cur.id);
-    var blank = !CRITERIA.every(function (c) { return r.scores[c.key]; })
-      || !String(r.why || '').trim() || !String(r.feedback || '').trim();
+    var blank = !CRITERIA.every(function (c) { return r.scores[c.key]; }) || isWrittenBlank(cur.id);
     if (blank && !showMissingOn[cur.id]) { showMissingOn[cur.id] = true; render(); return; }
   }
   if (cur.type === 'summary') {
@@ -891,9 +943,10 @@ function start(startups, round) {
       if (c.key === 'bottom') { c.label = ROUND.bottom.label; c.short = ROUND.bottom.short; }
     });
   }
+  if (ROUND.questions) CRITERIA = [];   // written-only: every score check passes vacuously
   if (isFinals()) {
-    document.title = 'Appirio Shark Tank — Finals Scoresheet';
-    document.getElementById('brand-sub').textContent = '· Finals Scoresheet';
+    document.title = 'Appirio Shark Tank — ' + sheetName();
+    document.getElementById('brand-sub').textContent = '· ' + sheetName();
   }
   load();
   ensureOrder(false);
