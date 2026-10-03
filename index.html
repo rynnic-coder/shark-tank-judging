@@ -149,6 +149,7 @@
     background:#fdeceb; color:#a02a1c; font-size:14px; border:1px solid #f6d4d0;
   }
   .err.show{display:block}
+  .err.wait{background:var(--accent-soft); color:var(--accent-dark); border-color:#cfe4e8}
 
   /* ── Misc ─────────────────────────────────────────────── */
   .banner{
@@ -274,8 +275,29 @@ function post(action, body, cb) {
     .then(function (r) { return r.json(); })
     .then(cb)
     .catch(function () {
-      cb({ ok:false, error:'Could not reach the server. Check your connection and try again — nothing was lost.' });
+      // Also lands here when Apps Script is over its concurrency limit and answers
+      // with an HTML error page instead of JSON — worth retrying either way.
+      cb({ ok:false, retry:true, error:'Could not reach the server. Check your connection and try again — nothing was lost.' });
     });
+}
+
+/**
+ * Calls fn(cb) until it succeeds, fails for good (no `retry` flag), or `budgetMs`
+ * runs out. When a whole room hits Submit together, most calls just need to wait
+ * their turn; randomized, growing gaps spread them out instead of re-colliding.
+ */
+function withRetry(fn, budgetMs, onWait, cb) {
+  var started = Date.now(), attempt = 0;
+  (function once() {
+    fn(function (res) {
+      if ((res && res.ok) || (res && !res.retry)) return cb(res);
+      attempt++;
+      var delay = Math.min(15000, 1500 * Math.pow(1.5, attempt)) * (0.5 + Math.random());
+      if (Date.now() - started + delay > budgetMs) return cb(res);
+      if (onWait) onWait(attempt);
+      setTimeout(once, delay);
+    });
+  })();
 }
 
 var Server = {
@@ -283,7 +305,7 @@ var Server = {
     if (window.PREVIEW) return cb(window.PREVIEW.authenticate(pw));
     if (LIVE) {
       return google.script.run.withSuccessHandler(cb)
-        .withFailureHandler(function (e) { cb({ ok:false, error:e.message }); })
+        .withFailureHandler(function (e) { cb({ ok:false, retry:true, error:e.message }); })
         .authenticate(pw);
     }
     if (CONFIG.execUrl) return post('auth', { password: pw }, cb);
@@ -293,7 +315,7 @@ var Server = {
     if (window.PREVIEW) return cb(window.PREVIEW.submit(payload));
     if (LIVE) {
       return google.script.run.withSuccessHandler(cb)
-        .withFailureHandler(function (e) { cb({ ok:false, error:e.message }); })
+        .withFailureHandler(function (e) { cb({ ok:false, retry:true, error:e.message }); })
         .submitResponses(pw, payload);
     }
     if (CONFIG.execUrl) return post('submit', { password: pw, payload: payload }, cb);
@@ -824,13 +846,19 @@ function doSubmit(btn, err) {
   err.className = 'err';
   btn.disabled = true;
   btn.textContent = 'Submitting…';
-  Server.submit(PASSWORD, {
+  var payload = {
     email: state.email,
     order: state.order,
     responses: state.responses,
     ranks: state.ranks,
     rankWhy: state.rankWhy,
     comments: state.comments
+  };
+  withRetry(function (cb) { Server.submit(PASSWORD, payload, cb); }, 4 * 60 * 1000, function () {
+    btn.textContent = 'Still saving…';
+    err.textContent = 'Lots of people are submitting right now, so you\u2019re in a short queue. ' +
+      'Keep this tab open \u2014 it will finish on its own.';
+    err.className = 'err show wait';
   }, function (res) {
     if (res && res.ok) {
       renderDone(res.submissionId);
@@ -958,7 +986,7 @@ function start(startups, round) {
 }
 
 function tryAuth(pw, onFail) {
-  Server.authenticate(pw, function (res) {
+  withRetry(function (cb) { Server.authenticate(pw, cb); }, 45 * 1000, null, function (res) {
     // start() loads saved answers first, then persists — saving here would clobber them.
     if (res && res.ok) { PASSWORD = pw; start(res.startups, res.round); }
     else onFail((res && res.error) || 'Could not check the password. Reload and try again.');
