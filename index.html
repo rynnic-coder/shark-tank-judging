@@ -49,6 +49,7 @@
   h1.title{font-size:28px; letter-spacing:-.02em}
   h2.title{font-size:24px; letter-spacing:-.02em}
   .subhead{margin-top:10px; font-size:16px}
+  .founder{margin:4px 0 0; color:var(--ink-soft); font-size:16px}
   .subhead a{font-weight:600}
   p{margin:14px 0}
   .lede{color:var(--ink-soft)}
@@ -179,7 +180,7 @@
   <div class="card">
     <div class="eyebrow">Appirio Shark Tank</div>
     <h1>Judge Scoresheet</h1>
-    <p class="lede">Async review round. Enter the shared password from your invite email to begin.</p>
+    <p class="lede">Enter the shared password from your invite email to begin.</p>
     <input type="password" id="pw" placeholder="Password" style="margin-top:6px" autocomplete="current-password" aria-label="Shared password">
     <div class="err" id="gate-err"></div>
     <p style="margin-top:18px"><button class="btn-primary" id="gate-go">Enter</button></p>
@@ -190,7 +191,7 @@
 <div id="app" class="hidden">
   <header>
     <div class="wrap head-row">
-      <div class="brand">Appirio Shark Tank <span>· Judge Scoresheet</span></div>
+      <div class="brand">Appirio Shark Tank <span id="brand-sub">· Judge Scoresheet</span></div>
       <div class="stepcount" id="stepcount"></div>
     </div>
     <div class="bar"><i id="progress"></i></div>
@@ -204,6 +205,7 @@
       <button class="btn-primary" id="next">Next →</button>
       <span class="savenote" id="savenote">Answers save automatically in this browser</span>
       <span class="spacer"></span>
+      <button class="btn-quiet" id="switch" title="Sign out and enter a different password. Your answers here stay saved.">Switch scoresheet</button>
       <button class="btn-quiet" id="clear">Clear entire form</button>
     </div>
   </footer>
@@ -222,7 +224,11 @@ var CONFIG = {
   execUrl: 'https://script.google.com/macros/s/AKfycbzb1X8LvDNXHM7PRCC3O2fGRd9XNrQNRQZPl-PHxHkDvomdrwTBv86lS5rF_ZvH9GvG/exec'
 };
 
-var STORE_KEY = 'appirioSharkTank.v1';
+// Each round saves under its own key, so a judge doing both keeps both sets of answers.
+// The async round keeps the original key so judges mid-review don't lose anything.
+var STORE_BASE = 'appirioSharkTank.v1';
+var STORE_KEY = STORE_BASE;
+var PW_KEY = STORE_BASE + '.pw';
 
 var CRITERIA = [
   { key:'market', short:'Market',   label:'Compelling market opportunity',
@@ -300,7 +306,20 @@ var Server = {
 // ═══════════════════════════════════════════════════════════
 var STARTUPS = [];
 var PASSWORD = '';
+// Set from the server on a good password. Defaults are the async round.
+var ROUND = { key:'async', topN:5, shuffle:true };
 var state = blankState();
+
+function isFinals() { return ROUND.key === 'finals'; }
+function noun() { return isFinals() ? 'Finalist' : 'Startup'; }
+function rankList() {
+  var a = [];
+  for (var n = 1; n <= ROUND.topN; n++) a.push(n);
+  return a;
+}
+function rankedCount() {
+  return rankList().filter(function (n) { return state.ranks[String(n)]; }).length;
+}
 
 function blankState() {
   return { email:'', order:[], responses:{}, ranks:{}, rankWhy:'', comments:'', page:0, seed:0 };
@@ -309,7 +328,7 @@ function blankState() {
 function save() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
-    localStorage.setItem(STORE_KEY + '.pw', PASSWORD);
+    localStorage.setItem(PW_KEY, PASSWORD);
   } catch (e) {}
 }
 function load() {
@@ -363,6 +382,10 @@ function shuffleOrder(seed) {
   return a;
 }
 function ensureOrder(force) {
+  if (!ROUND.shuffle) {   // finals: everyone sees the same fixed order
+    state.order = STARTUPS.map(function (s) { return s.id; });
+    return;
+  }
   var ids = STARTUPS.map(function (s) { return s.id; }).sort().join(',');
   var have = (state.order || []).slice().sort().join(',');
   if (force || !state.order.length || have !== ids) {
@@ -403,14 +426,18 @@ function renderIntro() {
   var frag = document.createDocumentFragment();
 
   var body = [
-    el('div', { class:'eyebrow', text:'Async review round' }),
-    el('h1', { class:'title', text:'Appirio Shark Tank — Judge Scoresheet' }),
-    el('p', { class:'lede', html:
-      'Thanks for judging. You\'ll watch <b>' + STARTUPS.length + ' pitch videos</b> and score each one on six criteria, ' +
-      'then pick your Top 5. Budget roughly 5&ndash;8 minutes per startup.' }),
+    el('div', { class:'eyebrow', text:isFinals() ? 'Finals' : 'Async review round' }),
+    el('h1', { class:'title', text:isFinals() ? 'Appirio Shark Tank — Finals Scoresheet' : 'Appirio Shark Tank — Judge Scoresheet' }),
+    el('p', { class:'lede', html: isFinals()
+      ? 'Thanks for judging the finals. You\'ll score each of our <b>' + STARTUPS.length + ' finalists</b> on six criteria, ' +
+        'then pick your Top ' + ROUND.topN + '.'
+      : 'Thanks for judging. You\'ll watch <b>' + STARTUPS.length + ' pitch videos</b> and score each one on six criteria, ' +
+        'then pick your Top ' + ROUND.topN + '. Budget roughly 5&ndash;8 minutes per startup.' }),
     el('ul', { class:'plain', html:
-      '<li><b>One startup per page.</b> Watch the video, score the six criteria, add a short "why," and leave the founder some constructive feedback.</li>' +
-      '<li><b>The order is randomized</b> for every judge, so no one gets an advantage from going first or last.</li>' +
+      '<li><b>One ' + noun().toLowerCase() + ' per page.</b> Score the six criteria, add a short "why," and leave the founder some constructive feedback. Each page links to the original pitch video.</li>' +
+      (isFinals()
+        ? '<li><b>The finalists appear in a set order</b>, the same for every judge.</li>'
+        : '<li><b>The order is randomized</b> for every judge, so no one gets an advantage from going first or last.</li>') +
       '<li><b>Scores run 4 (Strong) to 1 (Missing).</b> Hover any score to see what it means for that criterion.</li>' +
       '<li><b>You can stop and come back.</b> Answers save in this browser automatically &mdash; just don\'t switch computers or clear your history mid-review.</li>' +
       '<li><b>Nothing is recorded until you hit Submit</b> on the final page.</li>' })
@@ -468,7 +495,7 @@ function renderStartup(id, showMissing) {
   var fbBlank = !String(r.feedback || '').trim();
 
   var parts = [];
-  if (nMissing) parts.push(nMissing === 6 ? 'none of the 6 criteria are scored'
+  if (nMissing) parts.push(nMissing === CRITERIA.length ? 'none of the 6 criteria are scored'
                                           : nMissing + ' of the 6 criteria are unscored');
   if (whyBlank && fbBlank) parts.push('both written answers are blank');
   else if (whyBlank) parts.push('\u201cWhy or why not?\u201d is blank');
@@ -480,8 +507,9 @@ function renderStartup(id, showMissing) {
     : null;
 
   frag.appendChild(card([
-    el('div', { class:'eyebrow', text:'Startup ' + pos + ' of ' + state.order.length }),
+    el('div', { class:'eyebrow', text:noun() + ' ' + pos + ' of ' + state.order.length }),
     el('h2', { class:'title', text:s.name }),
+    s.founder ? el('p', { class:'founder', text:s.founder }) : null,
     el('p', { class:'subhead', html:
       '<a href="' + s.video + '" target="_blank" rel="noopener">Watch Pitch Video Here</a> &nearr;' }),
     flag,
@@ -510,9 +538,14 @@ function scoreRecap(id) {
   var given = CRITERIA.filter(function (c) { return scores[c.key]; });
   if (!given.length) return 'You haven\u2019t scored this one yet.';
 
-  var lines = CRITERIA.map(function (c) {
+  var lines = CRITERIA.filter(function (c) { return c.key !== 'bottom'; }).map(function (c) {
     return c.short + ': ' + (scores[c.key] || '\u2014');
   });
+  // The bottom-line call gets its full question, since that's the one that decides it.
+  var bottom = CRITERIA.filter(function (c) { return c.key === 'bottom'; })[0];
+  var b = scores.bottom;
+  lines.push(bottom.label.replace(/^Bottom line:\s*/, '') + ' ' +
+             (b ? bottom.tips[b] + ' (' + b + ')' : '\u2014'));
   var sum = given.reduce(function (t, c) { return t + scores[c.key]; }, 0);
   lines.push(given.length === CRITERIA.length
     ? 'Total ' + sum + ' of 24  \u00b7  avg ' + (sum / CRITERIA.length).toFixed(1)
@@ -541,7 +574,8 @@ function saveSoon() { clearTimeout(saveTimer); saveTimer = setTimeout(save, 400)
 // ── Summary ────────────────────────────────────────────────
 function renderSummary(showMissing) {
   var frag = document.createDocumentFragment();
-  var RANKS = [1,2,3,4,5];
+  var RANKS = rankList();
+  var N = ROUND.topN;
 
   var head = el('tr', {}, [el('th', { class:'rowhead', text:'' })]);
   RANKS.forEach(function (n) { head.appendChild(el('th', { text:String(n) })); });
@@ -584,30 +618,31 @@ function renderSummary(showMissing) {
   });
   redraw.forEach(function (f) { f(); });
 
-  var picked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; }).length;
-  var counter = el('p', { class:'hint', text:picked + ' of 5 ranks assigned' });
+  var picked = rankedCount();
+  var counter = el('p', { class:'hint', text:picked + ' of ' + N + ' ranks assigned' });
   var recount = function () {
-    var p = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; }).length;
-    counter.textContent = p + ' of 5 ranks assigned';
+    counter.textContent = rankedCount() + ' of ' + N + ' ranks assigned';
   };
   redraw.push(recount);
 
   var kids = [
     el('div', { class:'eyebrow', text:'Final section' }),
     el('h2', { class:'title', text:'Summary' }),
-    el('p', { class:'lede', text:'Now that you have seen them all, pick the five you would most want on the Shark Tank stage.' })
+    el('p', { class:'lede', text: isFinals()
+      ? 'Now that you have scored them all, pick your top three finalists.'
+      : 'Now that you have seen them all, pick the five you would most want on the Shark Tank stage.' })
   ];
-  if (showMissing && picked < 5) {
-    kids.push(el('div', { class:'banner', text:'Assign all five ranks below before submitting.' }));
+  if (showMissing && picked < N) {
+    kids.push(el('div', { class:'banner', text:'Assign all ' + N + ' ranks below before submitting.' }));
   }
   kids.push(el('div', { class:'field' }, [
-    el('p', { class:'qlabel', text:'Rank your Top 5 Startups' }),
+    el('p', { class:'qlabel', text:'Rank your Top ' + N + (isFinals() ? ' Finalists' : ' Startups') }),
     el('p', { class:'qhelp', text:'1 is your top pick. One startup per column, one column per startup — checking a new box moves that startup. Hover the i beside a name to see the scores you gave it.' }),
     el('table', { class:'grid rank' }, [el('thead', {}, [head]), tbody]),
     counter
   ]));
   kids.push(el('div', { class:'field' }, [
-    el('p', { class:'qlabel', text:'Why these 5? Please Explain…' }),
+    el('p', { class:'qlabel', text:'Why these ' + N + '? Please Explain…' }),
     bindText(el('textarea', { placeholder:'Your answer' }), function (v) { state.rankWhy = v; }, state.rankWhy)
   ]));
   kids.push(el('div', { class:'field' }, [
@@ -643,9 +678,9 @@ function issues() {
       out.push({ text:byId(id).name + ' — ' + missing + ' of 6 scores missing', page:i + 1 });
     }
   });
-  var picked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; });
-  if (picked.length < 5) {
-    out.push({ text:'Rank your Top 5 (' + picked.length + ' of 5 assigned)', page:idx.length - 2 });
+  var picked = rankedCount();
+  if (picked < ROUND.topN) {
+    out.push({ text:'Rank your Top ' + ROUND.topN + ' (' + picked + ' of ' + ROUND.topN + ' assigned)', page:idx.length - 2 });
   }
   return out;
 }
@@ -680,15 +715,15 @@ function renderReview() {
   var list = el('ul', { class:'check-list' });
   [
     { ok:/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(state.email), text:state.email ? 'Judging as ' + state.email : 'Email address missing', page:0 },
-    { ok:scored === state.order.length, text:scored + ' of ' + state.order.length + ' startups fully scored', page:1 },
-    { ok:[1,2,3,4,5].every(function (n) { return state.ranks[String(n)]; }), text:'Top 5 ranked', page:pages().length - 2 },
+    { ok:scored === state.order.length, text:scored + ' of ' + state.order.length + ' ' + noun().toLowerCase() + 's fully scored', page:1 },
+    { ok:rankedCount() === ROUND.topN, text:'Top ' + ROUND.topN + ' ranked', page:pages().length - 2 },
     written === state.order.length
-      ? { ok:true, text:'Written answers on all ' + state.order.length + ' startups', page:1 }
+      ? { ok:true, text:'Written answers on all ' + state.order.length + ' ' + noun().toLowerCase() + 's', page:1 }
       : { ok:false, soft:true, page:firstBlankWritten() + 1,
           text:(state.order.length - written === 1
-                 ? '1 startup has a blank written answer'
+                 ? '1 ' + noun().toLowerCase() + ' has a blank written answer'
                  : (state.order.length - written) + ' of ' + state.order.length +
-                   ' startups have a blank written answer') +
+                   ' ' + noun().toLowerCase() + 's have a blank written answer') +
             ' — optional, but the founders read these' }
   ].forEach(function (row) {
     list.appendChild(el('li', {}, [
@@ -698,13 +733,13 @@ function renderReview() {
   });
   kids.push(list);
 
-  var ranked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; });
+  var ranked = rankList().filter(function (n) { return state.ranks[String(n)]; });
   if (ranked.length) {
     var rl = el('ul', { class:'rank-summary' });
     ranked.forEach(function (n) {
       rl.appendChild(el('li', { html:'<b>No. ' + n + '</b> ' + escapeHtml(byId(state.ranks[String(n)]).name) }));
     });
-    kids.push(el('div', { class:'field' }, [el('p', { class:'qlabel', text:'Your Top 5' }), rl]));
+    kids.push(el('div', { class:'field' }, [el('p', { class:'qlabel', text:'Your Top ' + ROUND.topN }), rl]));
   }
 
   var err = el('div', { class:'err', id:'submit-err' });
@@ -766,7 +801,7 @@ function renderDone(sid) {
       el('div', { class:'big', text:'🦈' }),
       el('h2', { class:'title', text:'Scoresheet received', style:'margin-top:16px' }),
       el('p', { class:'lede', html:'Thanks, ' + escapeHtml(state.email) + '. Your scores for all ' + state.order.length +
-        ' startups and your Top 5 are recorded.' + (sid ? '<br>Confirmation code <b>' + sid + '</b>.' : '') }),
+        ' ' + noun().toLowerCase() + 's and your Top ' + ROUND.topN + ' are recorded.' + (sid ? '<br>Confirmation code <b>' + sid + '</b>.' : '') }),
       el('p', { class:'hint', text:'You can close this tab. If you need to change an answer, reopen the link and submit again — the latest submission wins.' }),
       el('p', {}, [el('button', { class:'btn-ghost', text:'Back to my answers',
         onclick:function () { document.querySelector('footer').classList.remove('hidden'); go(state.page); } })])
@@ -800,7 +835,7 @@ function render() {
 
   document.getElementById('progress').style.width = (i / (p.length - 1) * 100) + '%';
   var label = cur.type === 'intro' ? 'Instructions'
-    : cur.type === 'startup' ? 'Startup ' + i + ' of ' + state.order.length
+    : cur.type === 'startup' ? noun() + ' ' + i + ' of ' + state.order.length
     : cur.type === 'summary' ? 'Summary' : 'Review & submit';
   document.getElementById('stepcount').textContent = label + '  ·  Page ' + (i + 1) + ' of ' + p.length;
 
@@ -822,8 +857,7 @@ document.getElementById('next').addEventListener('click', function () {
     if (blank && !showMissingOn[cur.id]) { showMissingOn[cur.id] = true; render(); return; }
   }
   if (cur.type === 'summary') {
-    var picked = [1,2,3,4,5].filter(function (n) { return state.ranks[String(n)]; }).length;
-    if (picked < 5 && !showMissingOn.summary) { showMissingOn.summary = true; render(); return; }
+    if (rankedCount() < ROUND.topN && !showMissingOn.summary) { showMissingOn.summary = true; render(); return; }
   }
   go(state.page + 1);
 });
@@ -839,12 +873,28 @@ document.getElementById('clear').addEventListener('click', function () {
   document.querySelector('footer').classList.remove('hidden');
   go(0);
 });
+document.getElementById('switch').addEventListener('click', function () {
+  save();   // answers stay under this round's key; only the remembered password goes
+  try { localStorage.removeItem(PW_KEY); } catch (e) {}
+  location.reload();
+});
 
 // ═══════════════════════════════════════════════════════════
 // Boot
 // ═══════════════════════════════════════════════════════════
-function start(startups) {
+function start(startups, round) {
   STARTUPS = startups;
+  ROUND = round || ROUND;
+  if (ROUND.key !== 'async') STORE_KEY = STORE_BASE + '.' + ROUND.key;
+  if (ROUND.bottom) {
+    CRITERIA.forEach(function (c) {
+      if (c.key === 'bottom') { c.label = ROUND.bottom.label; c.short = ROUND.bottom.short; }
+    });
+  }
+  if (isFinals()) {
+    document.title = 'Appirio Shark Tank — Finals Scoresheet';
+    document.getElementById('brand-sub').textContent = '· Finals Scoresheet';
+  }
   load();
   ensureOrder(false);
   if (state.page >= pages().length) state.page = 0;
@@ -857,7 +907,7 @@ function start(startups) {
 function tryAuth(pw, onFail) {
   Server.authenticate(pw, function (res) {
     // start() loads saved answers first, then persists — saving here would clobber them.
-    if (res && res.ok) { PASSWORD = pw; start(res.startups); }
+    if (res && res.ok) { PASSWORD = pw; start(res.startups, res.round); }
     else onFail((res && res.error) || 'Could not check the password. Reload and try again.');
   });
 }
@@ -881,7 +931,7 @@ document.getElementById('pw').addEventListener('keydown', function (e) {
 // Returning judge in the same browser: skip the gate.
 (function () {
   var saved = null;
-  try { saved = localStorage.getItem(STORE_KEY + '.pw'); } catch (e) {}
+  try { saved = localStorage.getItem(PW_KEY); } catch (e) {}
   if (saved) tryAuth(saved, function () { /* stale password — show the gate */ });
 })();
 </script>
