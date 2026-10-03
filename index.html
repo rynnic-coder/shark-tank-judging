@@ -467,7 +467,7 @@ function renderIntro() {
       : 'Thanks for judging. You\'ll watch <b>' + STARTUPS.length + ' pitch videos</b> and score each one on six criteria, ' +
         'then pick your Top ' + ROUND.topN + '. Budget roughly 5&ndash;8 minutes per startup.' }),
     el('ul', { class:'plain', html: isFeedback()
-      ? '<li><b>One finalist per page.</b> Tell them what you loved, offer some constructive feedback, and name one thing you can do to help. A line each is plenty. Each page links to the original pitch video.</li>' +
+      ? '<li><b>One finalist per page.</b> Tell them what you loved, offer some constructive feedback, and name one thing you can do to help. A line each is plenty.</li>' +
         '<li><b>The finalists appear in a set order</b>, the same for everyone.</li>' +
         '<li><b>You can stop and come back.</b> Answers save in this browser automatically.</li>' +
         '<li><b>Nothing is recorded until you hit Submit</b> on the final page.</li>'
@@ -581,8 +581,8 @@ function renderFeedbackStartup(id, showMissing) {
     el('div', { class:'eyebrow', text:noun() + ' ' + pos + ' of ' + state.order.length }),
     el('h2', { class:'title', text:s.name }),
     s.founder ? el('p', { class:'founder', text:s.founder }) : null,
-    el('p', { class:'subhead', html:
-      '<a href="' + s.video + '" target="_blank" rel="noopener">Watch Pitch Video Here</a> &nearr;' })
+    s.video ? el('p', { class:'subhead', html:
+      '<a href="' + s.video + '" target="_blank" rel="noopener">Watch Pitch Video Here</a> &nearr;' }) : null
   ];
   if (showMissing && blank.length) {
     kids.push(el('div', { class:'banner', text:'Still to do on ' + s.name + ': ' +
