@@ -222,7 +222,11 @@ var CONFIG = {
 
   // Where this page sends the password check and the finished scoresheet when it is
   // NOT being served by Apps Script itself — i.e. the GitHub Pages copy judges use.
-  execUrl: 'https://script.google.com/macros/s/AKfycbzb1X8LvDNXHM7PRCC3O2fGRd9XNrQNRQZPl-PHxHkDvomdrwTBv86lS5rF_ZvH9GvG/exec'
+  execUrl: 'https://script.google.com/macros/s/AKfycbzb1X8LvDNXHM7PRCC3O2fGRd9XNrQNRQZPl-PHxHkDvomdrwTBv86lS5rF_ZvH9GvG/exec',
+
+  // After the event: send any answers this browser holds but never submitted, so they
+  // land in the Sheet as Status = "Incomplete". Turn off to go back to submit-only.
+  recoverDrafts: true
 };
 
 // Each round saves under its own key, so a judge doing both keeps both sets of answers.
@@ -230,6 +234,8 @@ var CONFIG = {
 var STORE_BASE = 'appirioSharkTank.v1';
 var STORE_KEY = STORE_BASE;
 var PW_KEY = STORE_BASE + '.pw';
+var ROUND_KEYS = ['async', 'finals', 'feedback'];
+function storeKeyFor(roundKey) { return roundKey === 'async' ? STORE_BASE : STORE_BASE + '.' + roundKey; }
 
 var CRITERIA = [
   { key:'market', short:'Market',   label:'Compelling market opportunity',
@@ -320,6 +326,16 @@ var Server = {
     }
     if (CONFIG.execUrl) return post('submit', { password: pw, payload: payload }, cb);
     cb({ ok:false, error:'No backend configured.' });
+  },
+  recover: function (pw, roundKey, payload, cb) {
+    if (window.PREVIEW) return cb(window.PREVIEW.recover(roundKey, payload));
+    if (LIVE) {
+      return google.script.run.withSuccessHandler(cb)
+        .withFailureHandler(function (e) { cb({ ok:false, retry:true, error:e.message }); })
+        .recoverDraft(pw, roundKey, payload);
+    }
+    if (CONFIG.execUrl) return post('recover', { password: pw, round: roundKey, payload: payload }, cb);
+    cb({ ok:false, error:'No backend configured.' });
   }
 };
 
@@ -352,8 +368,10 @@ function rankedCount() {
 }
 
 function blankState() {
-  return { email:'', order:[], responses:{}, ranks:{}, rankWhy:'', comments:'', page:0, seed:0 };
+  return { email:'', order:[], responses:{}, ranks:{}, rankWhy:'', comments:'', page:0, seed:0,
+           draftId:newDraftId(), submitted:false, sentSig:'' };
 }
+function newDraftId() { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 function save() {
   try {
@@ -861,6 +879,8 @@ function doSubmit(btn, err) {
     err.className = 'err show wait';
   }, function (res) {
     if (res && res.ok) {
+      state.submitted = true;
+      save();
       renderDone(res.submissionId);
     } else {
       btn.disabled = false;
@@ -890,6 +910,76 @@ function renderDone(sid) {
   ]));
   window.scrollTo(0, 0);
 }
+
+// ═══════════════════════════════════════════════════════════
+// Unsubmitted drafts
+//
+// Answers live only in the judge's browser until Submit. After the event, reopening
+// the link sends whatever is here for every round, so the Sheet gets it as
+// Status = "Incomplete". `sentSig` remembers what was last sent, so an unchanged
+// draft isn't sent again; the server replaces a draft's earlier rows by its draftId.
+// ═══════════════════════════════════════════════════════════
+function draftPayload(s) {
+  return { draftId: s.draftId, email: s.email, order: s.order, responses: s.responses,
+           ranks: s.ranks, rankWhy: s.rankWhy, comments: s.comments };
+}
+function hasAnswers(s) {
+  if (String(s.email || '').trim() || String(s.rankWhy || '').trim() || String(s.comments || '').trim()) return true;
+  if (Object.keys(s.ranks || {}).some(function (k) { return s.ranks[k]; })) return true;
+  return Object.keys(s.responses || {}).some(function (id) {
+    var r = s.responses[id] || {};
+    return Object.keys(r.scores || {}).some(function (k) { return r.scores[k]; }) ||
+      Object.keys(r).some(function (k) { return k !== 'scores' && String(r[k] || '').trim(); });
+  });
+}
+function needsSending(s) {
+  return s && !s.submitted && hasAnswers(s) && JSON.stringify(draftPayload(s)) !== s.sentSig;
+}
+
+// Reads a round's saved draft, lets fn change it, writes it back. The current round
+// goes through `state` so the page and storage never disagree.
+function withStored(roundKey, fn) {
+  if (roundKey === ROUND.key) { fn(state); save(); return; }
+  try {
+    var raw = localStorage.getItem(storeKeyFor(roundKey));
+    if (!raw) return;
+    var s = JSON.parse(raw);
+    if (!s || typeof s !== 'object') return;
+    fn(s);
+    localStorage.setItem(storeKeyFor(roundKey), JSON.stringify(s));
+  } catch (e) {}
+}
+
+function recoverDrafts() {
+  if (!CONFIG.recoverDrafts) return;
+  ROUND_KEYS.forEach(function (key) {
+    var s = null;
+    withStored(key, function (d) {
+      if (!d.draftId) d.draftId = newDraftId();   // drafts saved before this existed
+      s = d;
+    });
+    if (!needsSending(s)) return;
+    var payload = draftPayload(s), sig = JSON.stringify(payload);
+    withRetry(function (cb) { Server.recover(PASSWORD, key, payload, cb); }, 60 * 1000, null, function (res) {
+      if (!res || !res.ok) return;   // left unsent; the next visit tries again
+      withStored(key, function (d) { d.sentSig = sig; });
+      if (key === ROUND.key && !res.skipped) {
+        document.getElementById('savenote').textContent = 'Your answers so far have been sent to the organizers';
+      }
+    });
+  });
+}
+
+// Catch edits made on this visit too, if the judge leaves without submitting.
+// A beacon outlives the closing tab; it can't report back, so sentSig stays put and
+// the next visit may resend — harmless, the server replaces by draftId.
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState !== 'hidden' || !CONFIG.recoverDrafts || !PASSWORD) return;
+  if (!needsSending(state) || window.PREVIEW || LIVE || !CONFIG.execUrl || !navigator.sendBeacon) return;
+  navigator.sendBeacon(CONFIG.execUrl, new Blob([JSON.stringify({
+    action: 'recover', password: PASSWORD, round: ROUND.key, payload: draftPayload(state)
+  })], { type: 'text/plain;charset=utf-8' }));
+});
 
 // ═══════════════════════════════════════════════════════════
 // Navigation
@@ -965,7 +1055,7 @@ document.getElementById('switch').addEventListener('click', function () {
 function start(startups, round) {
   STARTUPS = startups;
   ROUND = round || ROUND;
-  if (ROUND.key !== 'async') STORE_KEY = STORE_BASE + '.' + ROUND.key;
+  STORE_KEY = storeKeyFor(ROUND.key);
   if (ROUND.bottom) {
     CRITERIA.forEach(function (c) {
       if (c.key === 'bottom') { c.label = ROUND.bottom.label; c.short = ROUND.bottom.short; }
@@ -983,6 +1073,7 @@ function start(startups, round) {
   document.getElementById('gate').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   render();
+  recoverDrafts();
 }
 
 function tryAuth(pw, onFail) {
